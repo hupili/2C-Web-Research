@@ -6,7 +6,12 @@ string g_fn_escape ;
 string g_fn_output ;
 double g_alpha = 0.0 ;
 
-vector<list<int> > g_adj_list ;
+typedef struct _node_t {
+	int id ;
+	double weight ;
+} node_t ;
+
+vector<list<node_t> > g_adj_list ;
 vector<double> g_escape_vector ;
 vector<double> g_probability ;
 
@@ -78,13 +83,13 @@ void next_iteration(vector<double> & p){
 	
 	//transfer portion
 	for (int from = 0 ; from < g_node_count ; from ++ ){
-		double transfer = g_alpha * g_probability[from] / g_adj_list[from].size() ;
+		//double transfer = g_alpha * g_probability[from] / g_adj_list[from].size() ;
+		double transfer = g_alpha * g_probability[from] ;
 		escape += g_probability[from] * (1 - g_alpha) ;
-		list<int> &l = g_adj_list[from] ;
-		for ( list<int>::iterator it = l.begin() ;
+		list<node_t> &l = g_adj_list[from] ;
+		for ( list<node_t>::iterator it = l.begin() ;
 				it != l.end () ; it ++ ){
-			int to = *it ;	
-			p[to] += transfer ;
+			p[it->id] += transfer * it->weight ;
 		}
 	}
 
@@ -125,13 +130,18 @@ void init(){
 	//read link file 
 	char from[MAX_LINE] = {'\0'} ;
 	char to[MAX_LINE] = {'\0'} ;
+	char buffer[MAX_LINE] = {'\0'} ;
+	double weight = 0 ;
 	FILE *fp_link = fopen(g_fn_link.c_str(), "r") ;
 	if ( NULL == fp_link ){
 		exit(ERR_FILE_OPEN) ;
 	}
 	//build string to id mapping
-	while ( 2 == fscanf(fp_link, "%s%s", from, to) ){
-		//above sentence may overflow	
+	//while ( 2 == fscanf(fp_link, "%s%s", from, to) ){
+	int fnum = 0 ;
+	//while ( (fnum = fscanf(fp_link, "%s%s%lf", from, to, &weight)) >= 2 ){
+	while ( fgets(buffer, MAX_LINE, fp_link) ){
+		fnum = sscanf(buffer , "%s%s%lf", from, to, &weight) ;
 		if ( ! g_name2index.count(from) ){
 			g_name2index[from] = g_node_count ;
 			g_index2name[g_node_count] = from ;
@@ -149,19 +159,43 @@ void init(){
 	g_escape_vector.reserve(g_node_count) ;
 	g_probability.reserve(g_node_count) ;
 	for ( int i = 0 ; i < g_node_count ; i ++ ){
-		g_adj_list.push_back(list<int>()) ;
+		g_adj_list.push_back(list<node_t>()) ;
 		g_escape_vector.push_back(0.0) ;
 		g_probability.push_back(0.0) ;
 	}
 
 	//build adjacent list
 	rewind(fp_link) ;
-	while ( 2 == fscanf(fp_link, "%s%s", from, to) ){
+	//while ( (fnum = fscanf(fp_link, "%s%s%lf", from, to, &weight)) >= 2  ){
+	while ( fgets(buffer, MAX_LINE, fp_link) ){
+		fnum = sscanf(buffer , "%s%s%lf", from, to, &weight) ;
 		int from_index = g_name2index[from] ;
 		int to_index = g_name2index[to] ;
-		g_adj_list[from_index].push_back(to_index) ;		
+		node_t tmp ;
+		tmp.id = to_index ;
+		if ( fnum == 3 ) {
+			tmp.weight = weight ;
+		} else {
+			tmp.weight = 1 ;	
+		}
+		g_adj_list[from_index].push_back(tmp) ;
 	}
 	fclose(fp_link) ;
+
+	//normalize adjacent list weights 
+	for ( unsigned int from = 0 ; from < g_adj_list.size() ; from ++ ){
+		list<node_t> &l = g_adj_list[from] ;
+		double total_weight = 0.0 ;
+		for ( list<node_t>::iterator it = l.begin() ;
+				it != l.end() ; it ++ ){
+			//node_t &tmp = *it ;
+			total_weight += it->weight ;
+		}
+		for ( list<node_t>::iterator it = l.begin() ;
+				it != l.end() ; it ++ ){
+			it->weight /= total_weight;
+		}
+	}
 
 	//read escape vector file
 	//for ( vector<double>::iterator it = g_escape_vector.begin() ;
@@ -173,7 +207,7 @@ void init(){
 		exit(ERR_FILE_OPEN) ;
 	}
 	double total_weight = 0 ;
-	double weight = 0 ;
+	//double weight = 0 ;
 	char node[MAX_LINE] = {'\0'} ;
 	while ( 2 == fscanf(fp_escape, "%s%lf", node, &weight)) {
 		int index = g_name2index[node] ;
