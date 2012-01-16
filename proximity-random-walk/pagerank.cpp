@@ -237,11 +237,16 @@ void init(){
 	double total_weight = 0 ;
 	//double weight = 0 ;
 	char node[MAX_LINE] = {'\0'} ;
-	while ( 2 == fscanf(fp_escape, "%s%lf", node, &weight)) {
-		//int index = g_name2index[node] ;
-		int index = atoi(node) - 1 ;
-		g_escape_vector[index] = weight ;
-		total_weight += weight ;
+	while ( fgets(buffer, MAX_LINE, fp_link) ){
+		if ( 2 == sscanf(buffer, "%s%lf", node, &weight) ) {
+			//while ( 2 == fscanf(fp_escape, "%s%lf", node, &weight)) {
+			//int index = g_name2index[node] ;
+			int index = atoi(node) - 1 ;
+			g_escape_vector[index] = weight ;
+			total_weight += weight ;
+		} else {
+			break ;
+		}
 	}
 	fclose(fp_escape) ;
 	if ( total_weight < eps ) {
