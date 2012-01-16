@@ -15,9 +15,8 @@
 using namespace std ;
 
 const int MAX_LINE = 1000 ;
-const int MAX_ITERATION = 1000 ;
+const int MAX_ITERATION = 10000 ;
 const double eps = 1e-6 ;
-//const double eps = 1e-7 ;
 
 const int ERR_PARAMETER = -1 ;
 const int ERR_FILE_OPEN = -2 ;

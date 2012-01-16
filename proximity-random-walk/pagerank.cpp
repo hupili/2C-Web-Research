@@ -16,22 +16,25 @@ vector<double> g_escape_vector ;
 vector<double> g_probability ;
 
 int g_node_count ;
-map<string, int> g_name2index ;
-map<int, string> g_index2name ;
+//map<string, int> g_name2index ;
+//map<int, string> g_index2name ;
 
 int main(int argc, char **argv){
-	if ( argc == 5 ){
+	if ( argc == 6 ){
 		g_execute = argv[0] ;
-		g_fn_link = argv[1] ;
-		g_fn_escape = argv[2] ;
-		g_fn_output = argv[3] ;
-		sscanf(argv[4], "%lf", &g_alpha) ;
+		g_node_count = atoi(argv[1]) ;
+		g_fn_link = argv[2] ;
+		g_fn_escape = argv[3] ;
+		g_fn_output = argv[4] ;
+		sscanf(argv[5], "%lf", &g_alpha) ;
 	} else {
 		print_usage() ;
 		exit(ERR_PARAMETER) ;
 	}	
 
+	fprintf(stderr, "start initialization\n") ;
 	init() ;	
+	fprintf(stderr, "finish initialization\n") ;
 
 	vector<double> cur_probability ;
 	cur_probability.reserve(g_node_count) ;
@@ -42,7 +45,7 @@ int main(int argc, char **argv){
 	double diff = 0.0 ;
 	next_iteration(cur_probability) ;
 	while ( (diff = average_diff(cur_probability, g_probability)) > eps ){
-		fprintf(stderr, "iteration %d: %f\n", iteration_count, diff) ;
+		fprintf(stderr, "iteration %d: %.10f\n", iteration_count, diff) ;
 		g_probability = cur_probability ;
 		if ( iteration_count >= MAX_ITERATION ){
 			break ;
@@ -54,7 +57,8 @@ int main(int argc, char **argv){
 	if ( iteration_count >= MAX_ITERATION ){
 		fprintf(stderr, "iteration terminated: due to MAX_ITERATION=%d\n", MAX_ITERATION) ;
 	} else {
-		fprintf(stderr, "iteration terminated: due to eps=%f\n", eps) ;
+		//fprintf(stderr, "iteration terminated: due to eps=%.10f\n", eps) ;
+		fprintf(stderr, "iteration terminated: due to eps=%.10f\n", diff) ;
 	}
 
 	output() ;
@@ -69,7 +73,8 @@ void output(){
 
 	for ( int i = 0 ; i < g_node_count ; i ++ ){
 		//fprintf(fp_out, "%s\t%f\n", g_index2name[i].c_str(), g_probability[i]) ;	
-		fprintf(fp_out, "%s\t%g\n", g_index2name[i].c_str(), g_probability[i]) ;	
+		//fprintf(fp_out, "%s\t%g\n", g_index2name[i].c_str(), g_probability[i]) ;	
+		fprintf(fp_out, "%d\t%g\n", i + 1, g_probability[i]) ;	
 	}
 	fclose(fp_out) ;
 }
@@ -85,7 +90,11 @@ void next_iteration(vector<double> & p){
 	for (int from = 0 ; from < g_node_count ; from ++ ){
 		//double transfer = g_alpha * g_probability[from] / g_adj_list[from].size() ;
 		double transfer = g_alpha * g_probability[from] ;
-		escape += g_probability[from] * (1 - g_alpha) ;
+		if ( g_adj_list[from].size() == 0 ) { 
+			escape += g_probability[from] ;
+		} else {
+			escape += g_probability[from] * (1 - g_alpha) ;
+		}
 		list<node_t> &l = g_adj_list[from] ;
 		for ( list<node_t>::iterator it = l.begin() ;
 				it != l.end () ; it ++ ){
@@ -100,20 +109,35 @@ void next_iteration(vector<double> & p){
 }
 
 double average_diff(vector<double> &p1, vector<double> &p2){
-	double diff = 0.0 ;
-	for (int i = 0 ; i < g_node_count ; i ++ ){
-		diff += fabs(p1[i] - p2[i]) ;
+	//double diff = 0.0 ;
+	//for (int i = 0 ; i < g_node_count ; i ++ ){
+	//	diff += fabs(p1[i] - p2[i]) ;
+	//}
+	//return diff / g_node_count ;
+	
+	//sara difference:
+	//a norm vector dot product it self should be 1
+	double norm_p1 = 0.0 ;
+	double norm_p2 = 0.0 ;
+	double prod = 0.0 ;
+	for ( int i = 0 ; i < g_node_count ; i ++ ){
+		norm_p1 += p1[i] * p1[i] ;
+		norm_p2 += p2[i] * p2[i] ;
+		prod += p1[i] * p2[i] ;
 	}
-	return diff / g_node_count ;
+	return sqrt(1 - prod * prod / norm_p1 / norm_p2) ;		
 }
 
 void print_usage(){
 	printf(
-			"usage: %s {fn_link} {fn_escape} {fn_output} {alpha}\n" 
+			"pagerank module, %d-bit version\n"
+			"usage: %s {n} {fn_link} {fn_escape} {fn_output} {alpha}\n" 
+			"    {n}: node number. node id is in range(1,n)\n"
 			"    {fn_link}: the 'link' file from raw data\n"
 			"    {fn_escape}: the escape vector file\n"
 			"    {fn_output}: the probability output file\n" 
 			"    {alpha}: the transfer ratio (0,1). (1-alpha) will escape \n" 
+			, (int)(sizeof(int*) * 8)
 			, g_execute.c_str() 
 		  ) ;
 }
@@ -123,9 +147,9 @@ void init(){
 	g_adj_list.clear() ;
 	g_escape_vector.clear() ;
 	g_probability.clear() ;
-	g_name2index.clear() ;
-	g_index2name.clear() ;
-	g_node_count = 0 ;
+//	g_name2index.clear() ;
+//	g_index2name.clear() ;
+	//g_node_count = 0 ;
 
 	//read link file 
 	char from[MAX_LINE] = {'\0'} ;
@@ -140,19 +164,19 @@ void init(){
 	//while ( 2 == fscanf(fp_link, "%s%s", from, to) ){
 	int fnum = 0 ;
 	//while ( (fnum = fscanf(fp_link, "%s%s%lf", from, to, &weight)) >= 2 ){
-	while ( fgets(buffer, MAX_LINE, fp_link) ){
-		fnum = sscanf(buffer , "%s%s%lf", from, to, &weight) ;
-		if ( ! g_name2index.count(from) ){
-			g_name2index[from] = g_node_count ;
-			g_index2name[g_node_count] = from ;
-			g_node_count ++ ;
-		}					
-		if ( ! g_name2index.count(to) ){
-			g_name2index[to] = g_node_count ;
-			g_index2name[g_node_count] = to ;
-			g_node_count ++ ;
-		}					
-	}
+	//while ( fgets(buffer, MAX_LINE, fp_link) ){
+	//	fnum = sscanf(buffer , "%s%s%lf", from, to, &weight) ;
+	//	if ( ! g_name2index.count(from) ){
+	//		g_name2index[from] = g_node_count ;
+	//		g_index2name[g_node_count] = from ;
+	//		g_node_count ++ ;
+	//	}					
+	//	if ( ! g_name2index.count(to) ){
+	//		g_name2index[to] = g_node_count ;
+	//		g_index2name[g_node_count] = to ;
+	//		g_node_count ++ ;
+	//	}					
+	//}
 
 	//pre-allocate space
 	g_adj_list.reserve(g_node_count) ;
@@ -169,8 +193,10 @@ void init(){
 	//while ( (fnum = fscanf(fp_link, "%s%s%lf", from, to, &weight)) >= 2  ){
 	while ( fgets(buffer, MAX_LINE, fp_link) ){
 		fnum = sscanf(buffer , "%s%s%lf", from, to, &weight) ;
-		int from_index = g_name2index[from] ;
-		int to_index = g_name2index[to] ;
+		//int from_index = g_name2index[from] ;
+		//int to_index = g_name2index[to] ;
+		int from_index = atoi(from) - 1 ;
+		int to_index = atoi(to) - 1 ;
 		node_t tmp ;
 		tmp.id = to_index ;
 		if ( fnum == 3 ) {
@@ -197,6 +223,8 @@ void init(){
 		}
 	}
 
+	//below
+
 	//read escape vector file
 	//for ( vector<double>::iterator it = g_escape_vector.begin() ;
 	//		it != g_escape_vector.end() ; it ++ ){
@@ -210,7 +238,8 @@ void init(){
 	//double weight = 0 ;
 	char node[MAX_LINE] = {'\0'} ;
 	while ( 2 == fscanf(fp_escape, "%s%lf", node, &weight)) {
-		int index = g_name2index[node] ;
+		//int index = g_name2index[node] ;
+		int index = atoi(node) - 1 ;
 		g_escape_vector[index] = weight ;
 		total_weight += weight ;
 	}
@@ -218,6 +247,8 @@ void init(){
 	if ( total_weight < eps ) {
 		exit(ERR_ZERO_WEIGHT) ;
 	}
+	//above
+	
 	//normalize weight 
 	for ( vector<double>::iterator it = g_escape_vector.begin() ;
 			it != g_escape_vector.end() ; it ++ ){
