@@ -12,6 +12,15 @@
 #   * 'Wi.txt', 'Wj.txt', 'Ws.txt': triple of sparse matrix, 
 #     where each a(i,j) = s
 #   * 'Wz.txt': escape vector
+#
+#OUTPUT FILES:
+#   * 'rank': reaching probability of random walk, one record
+#      par line, with the format:
+#      'id' '\t' 'rank'
+#      where 'id' is the index in input matrix, starting from 1
+#
+#SUPER PARAMETERS:
+#   * transfer ratio, see the last parameter of 'pagerank' 
 
 if [[ $# == 1 ]] ; then
 	dir=$1
